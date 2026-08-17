@@ -556,15 +556,8 @@ function App() {
     }
 
     const now = Date.now();
-    if (lowerTrimmed === lastDispatchedTextRef.current.toLowerCase() && (now - lastDispatchedTimeRef.current) < 3500) {
+    if (lowerTrimmed === lastDispatchedTextRef.current.toLowerCase() && (now - lastDispatchedTimeRef.current) < 1500) {
       return;
-    }
-
-    if (lastAiResponseRef.current) {
-      const lastAiLower = lastAiResponseRef.current.toLowerCase();
-      if (lastAiLower.includes(lowerTrimmed) || lowerTrimmed.includes(lastAiLower.slice(0, 25))) {
-        return;
-      }
     }
 
     lastDispatchedTextRef.current = trimmed;
@@ -621,7 +614,6 @@ function App() {
           setLiveVoiceText('');
           isJarvisSpeakingRef.current = true;
           setIsJarvisSpeaking(true);
-          silenceUntilRef.current = Date.now() + 60000;
 
           if (currentAudioRef.current) {
             try {
@@ -635,10 +627,13 @@ function App() {
           const audio = new Audio(cacheBustUrl);
           currentAudioRef.current = audio;
 
+          let turnEnded = false;
           const handleTurnEnd = () => {
+            if (turnEnded) return;
+            turnEnded = true;
             isJarvisSpeakingRef.current = false;
             setIsJarvisSpeaking(false);
-            silenceUntilRef.current = Date.now() + 1500;
+            silenceUntilRef.current = Date.now() + 300;
 
             if (data.action?.type !== 'CLOSE_JARVIS') {
               setTimeout(() => {
@@ -648,7 +643,7 @@ function App() {
                     isRecognitionRunningRef.current = true;
                   } catch (e) {}
                 }
-              }, 1500);
+              }, 350);
             }
 
             setTimeout(() => {
@@ -656,17 +651,19 @@ function App() {
             }, 4000);
           };
 
+          // Watchdog in case onended doesn't fire
+          setTimeout(() => {
+            if (!turnEnded && isJarvisSpeakingRef.current) {
+              handleTurnEnd();
+            }
+          }, 15000);
+
           audio.onplay = () => {
             isJarvisSpeakingRef.current = true;
             setIsJarvisSpeaking(true);
-            silenceUntilRef.current = Date.now() + 60000;
           };
           audio.onended = handleTurnEnd;
-          audio.onpause = () => {
-            isJarvisSpeakingRef.current = false;
-            setIsJarvisSpeaking(false);
-            silenceUntilRef.current = Date.now() + 800;
-          };
+          audio.onpause = handleTurnEnd;
           audio.onerror = handleTurnEnd;
 
           audio.play().catch(() => {
@@ -724,7 +721,6 @@ function App() {
             setLiveVoiceText('');
             isJarvisSpeakingRef.current = true;
             setIsJarvisSpeaking(true);
-            silenceUntilRef.current = Date.now() + 60000;
 
             const rawWelcomeAudio = welcomeData.audio_url.startsWith('http') ? welcomeData.audio_url : `${API_BASE}${welcomeData.audio_url}`;
             const audio = new Audio(`${rawWelcomeAudio}${rawWelcomeAudio.includes('?') ? '&' : '?'}t=${Date.now()}`);
@@ -736,10 +732,10 @@ function App() {
             audio.onended = () => {
               isJarvisSpeakingRef.current = false;
               setIsJarvisSpeaking(false);
-              silenceUntilRef.current = Date.now() + 1500;
+              silenceUntilRef.current = Date.now() + 300;
               setTimeout(() => {
                 startListening();
-              }, 1500);
+              }, 350);
               setTimeout(() => {
                 setLogs([]);
               }, 3500);
@@ -747,11 +743,13 @@ function App() {
             audio.onerror = () => {
               isJarvisSpeakingRef.current = false;
               setIsJarvisSpeaking(false);
+              silenceUntilRef.current = Date.now() + 200;
               startListening();
             };
             audio.play().catch(() => {
               isJarvisSpeakingRef.current = false;
               setIsJarvisSpeaking(false);
+              silenceUntilRef.current = Date.now() + 200;
               startListening();
             });
           }
@@ -827,19 +825,6 @@ function App() {
         }
       }
       const trimmedPhrase = phrase.trim();
-      const lowerPhrase = trimmedPhrase.toLowerCase();
-
-      if (
-        lowerPhrase.includes('welcome back') ||
-        lowerPhrase.includes('systems are online') ||
-        (lastAiResponseRef.current && (
-          lowerPhrase.includes(lastAiResponseRef.current.toLowerCase().slice(0, 25)) ||
-          lastAiResponseRef.current.toLowerCase().includes(lowerPhrase)
-        ))
-      ) {
-        setLiveVoiceText('');
-        return;
-      }
 
       if (trimmedPhrase) {
         setLiveVoiceText(trimmedPhrase);
