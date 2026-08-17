@@ -39,7 +39,6 @@ const BiometricScanner = ({
 
   const videoRef = useRef(null);
   const streamRef = useRef(null);
-  const canvasRef = useRef(null);
   const animFrameRef = useRef(null);
 
   // States
