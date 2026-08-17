@@ -1973,18 +1973,26 @@ def chat():
             try:
                 chat_completion = groq_client.chat.completions.create(
                     messages=messages,
-                    model="llama-3.1-8b-instant",
+                    model="groq/compound",
                     temperature=0.2,
                     max_tokens=150
                 )
             except Exception as model_err:
-                print(f"[JARVIS BACKEND] Fast model fallback to 70b: {model_err}")
-                chat_completion = groq_client.chat.completions.create(
-                    messages=messages,
-                    model="llama-3.3-70b-versatile",
-                    temperature=0.2,
-                    max_tokens=150
-                )
+                print(f"[JARVIS BACKEND] Primary model fallback: {model_err}")
+                try:
+                    chat_completion = groq_client.chat.completions.create(
+                        messages=messages,
+                        model="openai/gpt-oss-120b",
+                        temperature=0.2,
+                        max_tokens=150
+                    )
+                except Exception as err2:
+                    chat_completion = groq_client.chat.completions.create(
+                        messages=messages,
+                        model="openai/gpt-oss-20b",
+                        temperature=0.2,
+                        max_tokens=150
+                    )
 
             ai_response = chat_completion.choices[0].message.content.strip()
             print(f"[JARVIS BACKEND] Groq AI Response: '{ai_response}'")
