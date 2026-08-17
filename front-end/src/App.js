@@ -898,17 +898,19 @@ function App() {
     } catch (err) {}
 
     const rearmRecognition = () => {
-      if (isListeningRef.current && !isJarvisSpeakingRef.current && !isRecognitionRunningRef.current && Date.now() >= silenceUntilRef.current) {
+      if (!isJarvisSpeakingRef.current && !isRecognitionRunningRef.current && Date.now() >= silenceUntilRef.current) {
         try {
           recognitionRef.current?.start();
+          setIsListening(true);
+          isListeningRef.current = true;
           isRecognitionRunningRef.current = true;
         } catch (e) {}
       }
     };
 
     window.addEventListener('click', rearmRecognition);
+    window.addEventListener('touchstart', rearmRecognition);
     window.addEventListener('focus', rearmRecognition);
-    window.addEventListener('blur', rearmRecognition);
     document.addEventListener('visibilitychange', rearmRecognition);
 
     return () => {
