@@ -556,8 +556,20 @@ function App() {
     }
 
     const now = Date.now();
-    if (lowerTrimmed === lastDispatchedTextRef.current.toLowerCase() && (now - lastDispatchedTimeRef.current) < 1500) {
+    if (lowerTrimmed === lastDispatchedTextRef.current.toLowerCase() && (now - lastDispatchedTimeRef.current) < 2500) {
       return;
+    }
+
+    // Acoustic Echo Suppression: Ignore if microphone captures AI's own spoken output
+    if (lastAiResponseRef.current) {
+      const cleanAi = lastAiResponseRef.current.toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+      const cleanPrompt = lowerTrimmed.replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+      if (cleanPrompt.length >= 6 && cleanAi.includes(cleanPrompt)) {
+        return;
+      }
+      if (cleanAi === cleanPrompt) {
+        return;
+      }
     }
 
     lastDispatchedTextRef.current = trimmed;
@@ -614,6 +626,7 @@ function App() {
           setLiveVoiceText('');
           isJarvisSpeakingRef.current = true;
           setIsJarvisSpeaking(true);
+          silenceUntilRef.current = Date.now() + 60000;
 
           if (currentAudioRef.current) {
             try {
@@ -633,17 +646,17 @@ function App() {
             turnEnded = true;
             isJarvisSpeakingRef.current = false;
             setIsJarvisSpeaking(false);
-            silenceUntilRef.current = Date.now() + 300;
+            silenceUntilRef.current = Date.now() + 1000;
 
             if (data.action?.type !== 'CLOSE_JARVIS') {
               setTimeout(() => {
-                if (isListeningRef.current && !isJarvisSpeakingRef.current && !isRecognitionRunningRef.current) {
+                if (isListeningRef.current && !isJarvisSpeakingRef.current && !isRecognitionRunningRef.current && Date.now() >= silenceUntilRef.current) {
                   try {
                     recognitionRef.current?.start();
                     isRecognitionRunningRef.current = true;
                   } catch (e) {}
                 }
-              }, 350);
+              }, 1000);
             }
 
             setTimeout(() => {
@@ -661,6 +674,7 @@ function App() {
           audio.onplay = () => {
             isJarvisSpeakingRef.current = true;
             setIsJarvisSpeaking(true);
+            silenceUntilRef.current = Date.now() + 60000;
           };
           audio.onended = handleTurnEnd;
           audio.onpause = handleTurnEnd;
@@ -732,10 +746,10 @@ function App() {
             audio.onended = () => {
               isJarvisSpeakingRef.current = false;
               setIsJarvisSpeaking(false);
-              silenceUntilRef.current = Date.now() + 300;
+              silenceUntilRef.current = Date.now() + 1000;
               setTimeout(() => {
                 startListening();
-              }, 350);
+              }, 1000);
               setTimeout(() => {
                 setLogs([]);
               }, 3500);
@@ -743,13 +757,13 @@ function App() {
             audio.onerror = () => {
               isJarvisSpeakingRef.current = false;
               setIsJarvisSpeaking(false);
-              silenceUntilRef.current = Date.now() + 200;
+              silenceUntilRef.current = Date.now() + 500;
               startListening();
             };
             audio.play().catch(() => {
               isJarvisSpeakingRef.current = false;
               setIsJarvisSpeaking(false);
-              silenceUntilRef.current = Date.now() + 200;
+              silenceUntilRef.current = Date.now() + 500;
               startListening();
             });
           }
@@ -825,6 +839,17 @@ function App() {
         }
       }
       const trimmedPhrase = phrase.trim();
+      const lowerPhrase = trimmedPhrase.toLowerCase();
+
+      // Acoustic Echo Suppression: Ignore if microphone captures AI's own spoken text
+      if (lastAiResponseRef.current) {
+        const cleanAi = lastAiResponseRef.current.toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+        const cleanPhrase = lowerPhrase.replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+        if (cleanPhrase.length >= 6 && cleanAi.includes(cleanPhrase)) {
+          setLiveVoiceText('');
+          return;
+        }
+      }
 
       if (trimmedPhrase) {
         setLiveVoiceText(trimmedPhrase);
@@ -843,7 +868,7 @@ function App() {
               processUserPromptRef.current(trimmedPhrase);
               setLiveVoiceText('');
             }
-          }, 1100);
+          }, 1500);
         }
       }
     };
